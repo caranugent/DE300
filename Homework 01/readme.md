@@ -1,10 +1,9 @@
-a readme.md file including how to run the code and what your expected outputs are (if the code is run)
-
+------------------------ HOW TO RUN PROGRAM ---------------------------------------------------------  
 To run this program: *** UPLOADING THE CORRECT FILE ****
 - clone csv file 'T_F41SCHEDULE_B43.csv' from the repo
 - upload 
 
-*** --------- EXPECTED OUTPUTS -------------------------------------------------------------------------- *** 
+------------------------- EXPECTED OUTPUTS ----------------------------------------------------------  
 When this program is run, there should be 4 cells that output corresponding plots. 
 
 *** Question 04 Outputs ***
