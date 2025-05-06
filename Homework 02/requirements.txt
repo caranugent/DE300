@@ -1,0 +1,10 @@
+pandas
+numpy
+matplotlib
+scikit-learn
+seaborn
+duckdb==1.2.2
+cassandra-driver
+cassandra-sigv4
+boto3
+
