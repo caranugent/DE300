@@ -13,8 +13,8 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install and set path of JAVA
-RUN apt-get update && apt-get install -y openjdk-11-jdk
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+RUN apt-get update && apt-get install -y openjdk-17-jdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH=$JAVA_HOME/bin:$PATH
 
 # install additional Python packages
