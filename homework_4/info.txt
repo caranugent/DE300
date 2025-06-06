@@ -1,0 +1,3 @@
+TEAM:   Cara Nugent
+MWAA:   nugent-MWAA
+S3:     nugent-bucket
