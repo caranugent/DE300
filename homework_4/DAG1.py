@@ -8,6 +8,8 @@ S3_PREFIX = "weather_data/"
 BASE_URL = "https://api.weather.gov/stations/{station}/observations/latest"
 WEATHER_STATIONS = ["KORD", "KENW", "KMDW", "KPNT"]
 
+start = pendulum.now('UTC').replace(minute=0, second=0, microsecond=0)
+end = start + timedelta(hours=48)
 
 # Default arguments dictionary for the DAG execution
 default_args = {
@@ -55,7 +57,8 @@ def collect_weather():
 
     
     # save data as a dataframe
-    df = pd.DataFrame(collected_data)
+    df = pd.DataFrame.from_dict(collected_data, orient="index")
+
 
     # make filename specific to time so it does not overwrite
     filename = f"weather_data_{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.csv"
@@ -79,8 +82,8 @@ weather_collection_dag = DAG(
     default_args=default_args,
     description='Collect weather data every 2 hours',
     schedule="0 */2 * * *",                             # Schedule interval for DAG execution as every 2 hours
-    start_date=datetime(2025, 6, 5),                    # Schedule to run for 2 days
-    end_date=datetime(2025, 6, 7),
+    start_date=start,                    # Schedule to run for 2 days
+    end_date=end,
     catchup=False,
     tags=["weather"]  # DAG tagging for categorization
 )

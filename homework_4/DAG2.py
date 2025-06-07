@@ -10,6 +10,9 @@ S3_PREFIX = "weather_data/"
 WEATHER_STATIONS = ["KORD", "KENW", "KMDW", "KPNT"]
 OUTPUT_PREFIX = "output_graphs/"
 
+# NOTE: ideally the DAG would run at midnight each night with the data from that previous day
+# but I was not able to implement this in code
+
 # Default arguments dictionary for the DAG execution
 default_args = {
     'owner': 'airflow',  # Owner of the DAG
@@ -18,9 +21,33 @@ default_args = {
     'retries': 1,  # Number of retry attempts upon failure
 }
 
+# function to generate dashboard for a given date
+def generate_date_dashboard(s3, date, df):
+    # today_df all entries with same date
+    today_df = df[df["timestamp"].dt.date == date]
 
-# function to generate a daily dashboard
-def generate_dashboard():
+    if today_df.empty:
+        return
+
+    # plot the three desired plots for today's data
+    for col in ["temperature", "visibility", "relativeHumidity"]:
+        plt.figure()
+        for station in today_df["station"].unique():
+            subset = today_df[today_df["station"] == station]
+            plt.plot(subset["timestamp"], subset[col], label=station)
+        plt.title(f"{col} on {date}")
+        plt.xlabel("Time")
+        plt.ylabel(col)
+        plt.legend()
+        output_path = f"/tmp/{col}_{date}.png"
+        plt.savefig(output_path)
+
+        s3.upload_file(output_path, S3_BUCKET, f"{OUTPUT_PREFIX}{col}_{date}.png")
+        os.remove(output_path)
+
+
+# function to generate each daily dashboard
+def generate_all_dashboards():
     s3 = boto3.client("s3")
 
     # get data from S3 bucket that was uploaded in task 1
@@ -46,31 +73,17 @@ def generate_dashboard():
 
     # organize data by date
     full_df = pd.concat(dfs)
-    full_df["date"] = full_df["timestamp"].dt.date
+    full_df["timestamp"] = pd.to_datetime(full_df["timestamp"])
 
     # TODAY SHOULD BE THE LAST TIME IN THE FILE: sort by timestamp
     full_df = full_df.sort_values(by="timestamp")
 
-    # today_df IS LAST 24 HOURS OF DATA (grab last 12 files)
-    today =  full_df.tail(1)["timestamp"].dt.date
+    # Get all unique dates in the dataset
+    unique_dates = full_df["timestamp"].dt.date.unique()
 
-    today_df = full_df.tail(12)
+    for date in unique_dates:
+        generate_date_dashboard(full_df, date, s3)
 
-    # plot the three desired plots for today's data
-    for col in ["temperature", "visibility", "relativeHumidity"]:
-        plt.figure()
-        for station in today_df["station"].unique():
-            subset = today_df[today_df["station"] == station]
-            plt.plot(subset["timestamp"], subset[col], label=station)
-        plt.title(f"{col} on {today}")
-        plt.xlabel("Time")
-        plt.ylabel(col)
-        plt.legend()
-        output_path = f"/tmp/{col}_{today}.png"
-        plt.savefig(output_path)
-
-        s3.upload_file(output_path, S3_BUCKET, f"{OUTPUT_PREFIX}{col}_{today}.png")
-        os.remove(output_path)
 
 # set up the DAG:
 daily_weather_dashboard_dag = DAG(
@@ -83,10 +96,10 @@ daily_weather_dashboard_dag = DAG(
     catchup=False,
     tags=["dashboard"]  # DAG tagging for categorization
 )
-
+ 
 # CALL THIS LATER
 task2 = PythonOperator(
     task_id="generate_daily_dashboard",
-    python_callable=generate_dashboard,
+    python_callable=generate_all_dashboards,
     dag = daily_weather_dashboard_dag
 )

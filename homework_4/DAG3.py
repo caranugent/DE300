@@ -77,7 +77,7 @@ def train_predict(s3, csv_keys):
     y = full_df["temperature"]
 
     # set up one-hot encoding for station (categorical data)
-    enc = OneHotEncoder(sparse=False)
+    enc = OneHotEncoder(sparse_output=False) 
     X_encoded = enc.fit_transform(X[["station"]])
     X = np.hstack([X_encoded, X.drop("station", axis=1).values])
 
@@ -87,7 +87,7 @@ def train_predict(s3, csv_keys):
     preds = []
 
     # get timestamp from last value, but sort by timestamp first
-    now = full_df.tail(1)["timestamp"]
+    now = full_df["timestamp"].max()
 
     # for each station, predict the temperature for the next 8 hours (in 30-minute increments)
     for station in full_df["station"].unique():
@@ -105,7 +105,7 @@ def train_predict(s3, csv_keys):
                 "visibility": full_df[full_df["station"] == station]["visibility"].mean(),
                 "relativeHumidity": full_df[full_df["station"] == station]["relativeHumidity"].mean(),
                 "heatIndex": full_df[full_df["station"] == station]["heatIndex"].mean(),
-                "hour": future_hour
+                "hour": future_hour.hour + future_hour.minute / 60.0
             }
 
             # set up row for prediction
@@ -138,6 +138,7 @@ weather_model_dag = DAG(
         # schedule="0 */20 * * *",  # Schedule interval for DAG execution as ever 20 hours
         # start_date=datetime(2025, 6, 5),
         # end_date=datetime(2025, 6, 7),
+    schedule=None,
     catchup=False,
     tags=["model"]  # DAG tagging for categorization
 )
