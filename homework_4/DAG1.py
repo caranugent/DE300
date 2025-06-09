@@ -75,6 +75,8 @@ def collect_weather():
     os.remove(local_path)
 
 
+start = pendulum.now('UTC').replace(minute=0, second=0, microsecond=0)
+end = start + timedelta(hours=48)
 
 # set up the DAG:
 weather_collection_dag = DAG(
@@ -82,8 +84,6 @@ weather_collection_dag = DAG(
     default_args=default_args,
     description='Collect weather data every 2 hours',
     schedule="0 */2 * * *",                             # Schedule interval for DAG execution as every 2 hours
-    start_date=start,                    # Schedule to run for 2 days
-    end_date=end,
     catchup=False,
     tags=["weather"]  # DAG tagging for categorization
 )
