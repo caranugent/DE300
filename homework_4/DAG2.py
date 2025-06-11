@@ -82,7 +82,7 @@ def generate_all_dashboards():
     unique_dates = full_df["timestamp"].dt.date.unique()
 
     for date in unique_dates:
-        generate_date_dashboard(full_df, date, s3)
+        generate_date_dashboard(s3, date, full_df)
 
 
 # set up the DAG:

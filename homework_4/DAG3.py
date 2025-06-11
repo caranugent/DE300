@@ -7,6 +7,8 @@ from io import BytesIO
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.impute import SimpleImputer
+
 
 S3_BUCKET = "nugent-bucket"
 S3_PREFIX = "weather_data/"
@@ -76,10 +78,15 @@ def train_predict(s3, csv_keys):
     X = full_df[[ "station", "dewpoint", "windSpeed", "barometricPressure", "visibility", "relativeHumidity", "heatIndex", "hour" ]]
     y = full_df["temperature"]
 
+    # mean imputation:
+    numeric_features = X.drop("station", axis=1)
+    imputer = SimpleImputer(strategy="mean")
+    X_numeric_imputed = imputer.fit_transform(numeric_features)
+
     # set up one-hot encoding for station (categorical data)
-    enc = OneHotEncoder(sparse_output=False) 
-    X_encoded = enc.fit_transform(X[["station"]])
-    X = np.hstack([X_encoded, X.drop("station", axis=1).values])
+    enc = OneHotEncoder(sparse_output=False)
+    X_station_encoded = enc.fit_transform(X[["station"]])
+    X = np.hstack([X_station_encoded, X_numeric_imputed])
 
     # linear regression model to predict temperature
     model = LinearRegression().fit(X, y)
@@ -92,6 +99,7 @@ def train_predict(s3, csv_keys):
     # for each station, predict the temperature for the next 8 hours (in 30-minute increments)
     for station in full_df["station"].unique():
         # 8 hours in 30 min intervals = 16 intervals
+        station_data = full_df[full_df["station"] == station]
         for i in range(1, 17):  
             future_hour = now + timedelta(minutes=30 * i)
             # future_hour = now + i * 0.5
@@ -99,17 +107,28 @@ def train_predict(s3, csv_keys):
             # use mean of past values
             row = {
                 "station": station,
-                "dewpoint": full_df[full_df["station"] == station]["dewpoint"].mean(),
-                "windSpeed": full_df[full_df["station"] == station]["windSpeed"].mean(),
-                "barometricPressure": full_df[full_df["station"] == station]["barometricPressure"].mean(),
-                "visibility": full_df[full_df["station"] == station]["visibility"].mean(),
-                "relativeHumidity": full_df[full_df["station"] == station]["relativeHumidity"].mean(),
-                "heatIndex": full_df[full_df["station"] == station]["heatIndex"].mean(),
+                "dewpoint": station_data["dewpoint"].mean(),
+                "windSpeed": station_data["windSpeed"].mean(),
+                "barometricPressure": station_data["barometricPressure"].mean(),
+                "visibility": station_data["visibility"].mean(),
+                "relativeHumidity": station_data["relativeHumidity"].mean(),
+                "heatIndex": station_data["heatIndex"].mean(),
                 "hour": future_hour.hour + future_hour.minute / 60.0
             }
 
+            # replace NaNs
+            row = {k: (0 if pd.isna(v) else v) for k, v in row.items()}
+
+            # Encode and transform input
+            station_df = pd.DataFrame([[row["station"]]], columns=["station"])
+            station_encoded = enc.transform(station_df)
+
+            numeric_vals = np.array([ row["dewpoint"], row["windSpeed"], row["barometricPressure"], row["visibility"], row["relativeHumidity"],row["heatIndex"],row["hour"]]).reshape(1, -1)
+
+            numeric_imputed = imputer.transform(numeric_vals)
+
             # set up row for prediction
-            x_row = np.hstack([enc.transform([[station]]), np.array(list(row.values())[1:]).reshape(1, -1)])
+            x_row = np.hstack([station_encoded, numeric_imputed])
 
             # predict and store temperature
             pred_temp = model.predict(x_row)[0]
